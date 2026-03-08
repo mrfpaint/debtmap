@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DebtMap — Loan Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0c0f;
+    --surface: #141418;
+    --surface2: #1c1c22;
+    --border: #2a2a35;
+    --accent: #f97316;
+    --accent2: #fb923c;
+    --red: #ef4444;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --text: #f1f0ee;
+    --muted: #6b6b7a;
+    --card-personal: #1a1528;
+    --card-cc: #151a28;
+    --card-other: #0f1f1a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Mono',monospace; min-height:100vh; overflow-x:hidden; }
+  body::before {
+    content:''; position:fixed; inset:0;
+    background-image: linear-gradient(rgba(249,115,22,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(249,115,22,0.03) 1px,transparent 1px);
+    background-size:40px 40px; pointer-events:none; z-index:0;
+  }
+  .container { max-width:1100px; margin:0 auto; padding:0 24px; position:relative; z-index:1; }
+
+  /* HEADER */
+  header { padding:32px 0 24px; border-bottom:1px solid var(--border); margin-bottom:36px; }
+  .header-inner { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+  .logo { font-family:'Syne',sans-serif; font-size:28px; font-weight:800; letter-spacing:-1px; }
+  .logo span { color:var(--accent); }
+  .header-date { color:var(--muted); font-size:12px; }
+
+  /* SYNC STATUS BAR */
+  .sync-bar {
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:10px 16px; margin-bottom:24px;
+    font-size:11px; gap:12px; flex-wrap:wrap;
+  }
+  .sync-status { display:flex; align-items:center; gap:8px; }
+  .sync-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .sync-dot.green { background:var(--green); box-shadow:0 0 0 3px rgba(34,197,94,0.2); }
+  .sync-dot.yellow { background:var(--yellow); box-shadow:0 0 0 3px rgba(234,179,8,0.2); animation:pulse 1.5s infinite; }
+  .sync-dot.red { background:var(--red); }
+  .sync-dot.gray { background:var(--muted); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .sync-label { color:var(--muted); }
+  .sync-actions { display:flex; gap:8px; align-items:center; }
+
+  /* SETUP BANNER */
+  .setup-banner {
+    background:linear-gradient(135deg,rgba(249,115,22,0.1),rgba(249,115,22,0.04));
+    border:1px solid rgba(249,115,22,0.3); border-radius:12px;
+    padding:20px 24px; margin-bottom:28px;
+  }
+  .setup-title { font-family:'Syne',sans-serif; font-size:15px; font-weight:700; margin-bottom:8px; color:var(--accent); }
+  .setup-desc { font-size:11px; color:var(--muted); margin-bottom:14px; line-height:1.6; }
+  .setup-input-row { display:flex; gap:10px; flex-wrap:wrap; }
+  .setup-input { flex:1; min-width:200px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-family:'DM Mono',monospace; font-size:12px; outline:none; }
+  .setup-input:focus { border-color:var(--accent); }
+
+  /* SUMMARY CARDS */
+  .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:36px; }
+  .summary-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; position:relative; overflow:hidden; }
+  .summary-card::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+  .summary-card.total::after { background:var(--accent); }
+  .summary-card.monthly::after { background:var(--yellow); }
+  .summary-card.loans::after { background:#818cf8; }
+  .summary-card.next::after { background:var(--red); }
+  .summary-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:10px; }
+  .summary-value { font-family:'Syne',sans-serif; font-size:26px; font-weight:700; line-height:1; }
+  .summary-value.warn { color:var(--accent); }
+  .summary-value.danger { color:var(--red); }
+  .summary-sub { font-size:11px; color:var(--muted); margin-top:6px; }
+
+  /* SECTION HEADER */
+  .section-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+  .section-title { font-family:'Syne',sans-serif; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:2px; color:var(--muted); }
+  .btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:10px 18px; font-family:'Syne',sans-serif; font-size:13px; font-weight:700; cursor:pointer; transition:background 0.2s,transform 0.1s; }
+  .btn:hover { background:var(--accent2); transform:translateY(-1px); }
+  .btn:active { transform:translateY(0); }
+  .btn-sm { padding:6px 12px; font-size:11px; border-radius:6px; }
+  .btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); font-family:'DM Mono',monospace; font-size:11px; padding:5px 10px; border-radius:6px; cursor:pointer; transition:all 0.2s; }
+  .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+
+  /* LOAN CARDS */
+  .loans-list { display:flex; flex-direction:column; gap:14px; margin-bottom:36px; }
+  .loan-card { border:1px solid var(--border); border-radius:14px; padding:20px 24px; position:relative; transition:border-color 0.2s,transform 0.15s; }
+  .loan-card:hover { border-color:rgba(249,115,22,0.4); transform:translateY(-1px); }
+  .loan-card[data-type="Personal Loan"] { background:var(--card-personal); }
+  .loan-card[data-type="Credit Card Debt"] { background:var(--card-cc); }
+  .loan-card[data-type="Other"] { background:var(--card-other); }
+  .loan-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .loan-name-row { display:flex; align-items:center; gap:10px; }
+  .loan-badge { font-size:9px; font-weight:600; padding:3px 8px; border-radius:20px; text-transform:uppercase; letter-spacing:1px; white-space:nowrap; }
+  .badge-personal { background:rgba(129,140,248,0.15); color:#a5b4fc; border:1px solid rgba(129,140,248,0.25); }
+  .badge-cc { background:rgba(249,115,22,0.12); color:#fb923c; border:1px solid rgba(249,115,22,0.25); }
+  .badge-other { background:rgba(34,197,94,0.12); color:#4ade80; border:1px solid rgba(34,197,94,0.25); }
+  .loan-name { font-family:'Syne',sans-serif; font-size:17px; font-weight:700; }
+  .loan-lender { font-size:11px; color:var(--muted); margin-top:2px; }
+  .loan-actions { display:flex; gap:8px; align-items:center; }
+  .loan-stats { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px 24px; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+  .loan-stat-label { font-size:9px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:3px; }
+  .loan-stat-val { font-size:14px; font-weight:500; }
+  .loan-stat-val.emi { color:var(--yellow); }
+  .loan-stat-val.due-soon { color:var(--red); }
+  .loan-stat-val.ok { color:var(--green); }
+  .progress-wrap { margin-top:14px; }
+  .progress-label { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-bottom:5px; }
+  .progress-bar { height:6px; background:var(--border); border-radius:99px; overflow:hidden; }
+  .progress-fill { height:100%; border-radius:99px; transition:width 0.6s ease; }
+  .fill-personal { background:linear-gradient(90deg,#818cf8,#a5b4fc); }
+  .fill-cc { background:linear-gradient(90deg,#f97316,#fb923c); }
+  .fill-other { background:linear-gradient(90deg,#22c55e,#4ade80); }
+
+  /* DUE TICKER */
+  .due-ticker { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); border-radius:10px; padding:12px 18px; margin-bottom:28px; display:flex; align-items:center; gap:12px; font-size:12px; }
+  .due-dot { width:8px; height:8px; background:var(--red); border-radius:50%; flex-shrink:0; box-shadow:0 0 0 3px rgba(239,68,68,0.2); animation:pulsered 1.5s infinite; }
+  @keyframes pulsered { 0%,100%{box-shadow:0 0 0 3px rgba(239,68,68,0.2)} 50%{box-shadow:0 0 0 6px rgba(239,68,68,0.1)} }
+
+  /* MODAL */
+  .modal-backdrop { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px); z-index:100; align-items:center; justify-content:center; padding:20px; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; animation:slideUp 0.25s ease; }
+  @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+  .modal-title { font-family:'Syne',sans-serif; font-size:18px; font-weight:700; margin-bottom:20px; }
+  .form-row { margin-bottom:16px; }
+  label { display:block; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+  input, select { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:10px 14px; color:var(--text); font-family:'DM Mono',monospace; font-size:13px; transition:border-color 0.2s; outline:none; }
+  input:focus, select:focus { border-color:var(--accent); }
+  select option { background:var(--surface2); }
+  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .modal-footer { display:flex; gap:10px; justify-content:flex-end; margin-top:22px; }
+  .payment-log { margin-top:14px; }
+  .payment-entry { display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .payment-entry:last-child { border-bottom:none; }
+  .payment-date { color:var(--muted); }
+  .payment-amt { color:var(--green); font-weight:500; }
+  .empty { text-align:center; padding:60px 20px; color:var(--muted); border:1px dashed var(--border); border-radius:14px; }
+  .empty-icon { font-size:40px; margin-bottom:12px; }
+  .empty-text { font-family:'Syne',sans-serif; font-size:15px; }
+
+  /* TOAST */
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 18px; font-size:12px; z-index:999; display:flex; align-items:center; gap:10px; transform:translateY(60px); opacity:0; transition:all 0.3s ease; pointer-events:none; }
+  .toast.show { transform:translateY(0); opacity:1; }
+  .toast.success { border-color:rgba(34,197,94,0.4); }
+  .toast.error { border-color:rgba(239,68,68,0.4); }
+
+  footer { border-top:1px solid var(--border); padding:20px 0; margin-top:40px; text-align:center; color:var(--muted); font-size:11px; }
+  @media(max-width:560px) { .loan-stats{grid-template-columns:1fr 1fr} .form-grid{grid-template-columns:1fr} .summary-value{font-size:20px} }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="header-inner">
+      <div>
+        <div class="logo">Debt<span>Map</span></div>
+        <div class="header-date" id="headerDate"></div>
+      </div>
+      <button class="btn" onclick="openAddModal()">+ Add Loan</button>
+    </div>
+  </header>
+
+  <!-- SYNC BAR -->
+  <div class="sync-bar">
+    <div class="sync-status">
+      <div class="sync-dot gray" id="syncDot"></div>
+      <span class="sync-label" id="syncLabel">Not connected to cloud</span>
+    </div>
+    <div class="sync-actions">
+      <span style="color:var(--muted);font-size:10px;" id="lastSyncTime"></span>
+      <button class="btn-ghost" onclick="manualSync()" id="syncBtn">↻ Sync Now</button>
+      <button class="btn-ghost" onclick="showSetup()" id="setupBtn">⚙ Setup</button>
+    </div>
+  </div>
+
+  <!-- SETUP BANNER -->
+  <div class="setup-banner" id="setupBanner">
+    <div class="setup-title">☁ Connect Google Sheets</div>
+    <div class="setup-desc">
+      Paste your Google Apps Script Web App URL below to enable cloud sync.<br>
+      Your data will be saved to your Google Sheet automatically on every change.
+    </div>
+    <div class="setup-input-row">
+      <input class="setup-input" type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/YOUR_ID/exec">
+      <button class="btn btn-sm" onclick="saveScriptUrl()">Connect</button>
+    </div>
+  </div>
+
+  <!-- SUMMARY -->
+  <div class="summary-grid">
+    <div class="summary-card total">
+      <div class="summary-label">Total Outstanding</div>
+      <div class="summary-value warn" id="totalOutstanding">₹0</div>
+      <div class="summary-sub" id="totalPaid">₹0 paid so far</div>
+    </div>
+    <div class="summary-card monthly">
+      <div class="summary-label">Monthly EMI Burden</div>
+      <div class="summary-value" id="totalEMI">₹0</div>
+      <div class="summary-sub" id="emiCount">across 0 loans</div>
+    </div>
+    <div class="summary-card loans">
+      <div class="summary-label">Active Loans</div>
+      <div class="summary-value" id="activeLoanCount">0</div>
+      <div class="summary-sub">personal, CC & other</div>
+    </div>
+    <div class="summary-card next">
+      <div class="summary-label">Next Due In</div>
+      <div class="summary-value danger" id="nextDue">—</div>
+      <div class="summary-sub" id="nextDueName">no upcoming dues</div>
+    </div>
+  </div>
+
+  <!-- DUE ALERT -->
+  <div class="due-ticker" id="dueTicker" style="display:none">
+    <div class="due-dot"></div>
+    <span id="dueTickerText"></span>
+  </div>
+
+  <!-- LOANS LIST -->
+  <div class="section-header">
+    <div class="section-title">Your Loans</div>
+    <select id="filterType" onchange="renderLoans()" style="width:auto;padding:6px 10px;font-size:11px;border-radius:6px;">
+      <option value="All">All Types</option>
+      <option value="Personal Loan">Personal Loan</option>
+      <option value="Credit Card Debt">Credit Card Debt</option>
+      <option value="Other">Other</option>
+    </select>
+  </div>
+  <div class="loans-list" id="loansList"></div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast">
+  <span id="toastIcon"></span>
+  <span id="toastMsg"></span>
+</div>
+
+<!-- ADD LOAN MODAL -->
+<div class="modal-backdrop" id="addModal">
+  <div class="modal">
+    <div class="modal-title">Add New Loan</div>
+    <div class="form-row"><label>Loan Name</label><input type="text" id="f_name" placeholder="e.g. HDFC Personal Loan"></div>
+    <div class="form-row"><label>Lender / Bank</label><input type="text" id="f_lender" placeholder="e.g. HDFC Bank"></div>
+    <div class="form-row"><label>Loan Type</label>
+      <select id="f_type"><option>Personal Loan</option><option>Credit Card Debt</option><option>Other</option></select>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Principal Amount (₹)</label><input type="number" id="f_principal" placeholder="500000"></div>
+      <div class="form-row"><label>Outstanding Balance (₹)</label><input type="number" id="f_balance" placeholder="350000"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>Monthly EMI (₹)</label><input type="number" id="f_emi" placeholder="12000"></div>
+      <div class="form-row"><label>Interest Rate (% p.a.)</label><input type="number" id="f_rate" placeholder="12.5" step="0.1"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-row"><label>EMI Due Date (each month)</label><input type="number" id="f_dueday" min="1" max="31" placeholder="5"></div>
+      <div class="form-row"><label>Months Remaining</label><input type="number" id="f_months" placeholder="24"></div>
+    </div>
+    <div class="form-row"><label>Notes</label><input type="text" id="f_notes" placeholder="Optional notes…"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('addModal')">Cancel</button>
+      <button class="btn" onclick="saveLoan()">Save Loan</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOG PAYMENT MODAL -->
+<div class="modal-backdrop" id="payModal">
+  <div class="modal">
+    <div class="modal-title">Log EMI Payment</div>
+    <div id="payLoanName" style="color:var(--muted);font-size:12px;margin-bottom:16px;"></div>
+    <div class="form-grid">
+      <div class="form-row"><label>Amount Paid (₹)</label><input type="number" id="p_amount" placeholder="12000"></div>
+      <div class="form-row"><label>Payment Date</label><input type="date" id="p_date"></div>
+    </div>
+    <div class="form-row"><label>Reduce Outstanding By</label>
+      <select id="p_reduce">
+        <option value="yes">Yes — reduce outstanding balance</option>
+        <option value="no">No — just log payment</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('payModal')">Cancel</button>
+      <button class="btn" onclick="confirmPayment()">Confirm Payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-backdrop" id="detailModal">
+  <div class="modal">
+    <div class="modal-title" id="detailTitle"></div>
+    <div id="detailBody"></div>
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeModal('detailModal')">Close</button>
+      <button class="btn btn-sm" id="detailPayBtn">Log Payment</button>
+    </div>
+  </div>
+</div>
+
+<footer><div class="container">DebtMap — Personal Loan Tracker &nbsp;·&nbsp; Cloud sync via Google Sheets</div></footer>
+
+<script>
+// ---- STATE ----
+let loans = [];
+let activePayLoanId = null;
+let scriptUrl = localStorage.getItem('debtmap_script_url') || '';
+let isSyncing = false;
+
+const today = new Date();
+const fmt = n => '₹' + Number(n||0).toLocaleString('en-IN');
+
+// ---- INIT ----
+document.getElementById('headerDate').textContent =
+  today.toLocaleDateString('en-IN', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('p_date').value = today.toISOString().split('T')[0];
+
+if (scriptUrl) {
+  document.getElementById('setupBanner').style.display = 'none';
+  document.getElementById('scriptUrlInput').value = scriptUrl;
+  loadFromCloud();
+} else {
+  document.getElementById('setupBanner').style.display = 'block';
+  // load sample data if no cloud
+  loans = getSampleData();
+  renderAll();
+}
+
+// ---- SETUP ----
+function showSetup() {
+  document.getElementById('setupBanner').style.display = 'block';
+  document.getElementById('scriptUrlInput').value = scriptUrl;
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function saveScriptUrl() {
+  const url = document.getElementById('scriptUrlInput').value.trim();
+  if (!url.startsWith('https://script.google.com')) {
+    showToast('Please enter a valid Apps Script URL', 'error'); return;
+  }
+  scriptUrl = url;
+  localStorage.setItem('debtmap_script_url', url);
+  document.getElementById('setupBanner').style.display = 'none';
+  showToast('Connected! Loading your data...', 'success');
+  loadFromCloud();
+}
+
+// ---- SYNC STATUS UI ----
+function setSyncStatus(state, msg) {
+  const dot = document.getElementById('syncDot');
+  const label = document.getElementById('syncLabel');
+  dot.className = 'sync-dot ' + state;
+  label.textContent = msg;
+}
+
+function setLastSync() {
+  const t = new Date().toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('lastSyncTime').textContent = 'Last sync: ' + t;
+}
+
+// ---- CLOUD LOAD ----
+async function loadFromCloud() {
+  if (!scriptUrl) return;
+  setSyncStatus('yellow', 'Loading from Google Sheets…');
+  try {
+    const res = await fetch(scriptUrl);
+    const text = await res.text();
+    const data = JSON.parse(text);
+    loans = Array.isArray(data) ? data : [];
+    setSyncStatus('green', 'Synced with Google Sheets');
+    setLastSync();
+    renderAll();
+    showToast('Data loaded from cloud ☁', 'success');
+  } catch(e) {
+    setSyncStatus('red', 'Cloud sync failed');
+    // fallback to localStorage
+    loans = JSON.parse(localStorage.getItem('debtmap_loans') || '[]');
+    renderAll();
+    showToast('Could not reach Google Sheets — using local data', 'error');
+  }
+}
+
+// ---- CLOUD SAVE ----
+async function saveToCloud() {
+  localStorage.setItem('debtmap_loans', JSON.stringify(loans)); // always save locally too
+  if (!scriptUrl) return;
+  if (isSyncing) return;
+  isSyncing = true;
+  setSyncStatus('yellow', 'Saving to Google Sheets…');
+  try {
+    await fetch(scriptUrl, {
+      method: 'POST',
+      body: JSON.stringify(loans),
+      headers: {'Content-Type': 'application/json'}
+    });
+    setSyncStatus('green', 'Synced with Google Sheets');
+    setLastSync();
+  } catch(e) {
+    setSyncStatus('red', 'Save failed — data kept locally');
+    showToast('Cloud save failed — data saved locally', 'error');
+  }
+  isSyncing = false;
+}
+
+async function manualSync() {
+  if (!scriptUrl) { showSetup(); return; }
+  await loadFromCloud();
+}
+
+// ---- TOAST ----
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  document.getElementById('toastIcon').textContent = type==='success' ? '✓' : '✕';
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ---- RENDER ----
+function renderAll() { renderSummary(); renderLoans(); }
+
+function renderSummary() {
+  const totalOuts = loans.reduce((s,l)=>s+(+l.balance||0),0);
+  const totalPaidAmt = loans.reduce((s,l)=>s+(l.payments||[]).reduce((a,p)=>a+(+p.amount),0),0);
+  const totalEMI = loans.reduce((s,l)=>s+(+l.emi||0),0);
+  document.getElementById('totalOutstanding').textContent = fmt(totalOuts);
+  document.getElementById('totalPaid').textContent = fmt(totalPaidAmt) + ' paid so far';
+  document.getElementById('totalEMI').textContent = fmt(totalEMI);
+  document.getElementById('emiCount').textContent = `across ${loans.length} loan${loans.length!==1?'s':''}`;
+  document.getElementById('activeLoanCount').textContent = loans.length;
+
+  if (loans.length > 0 && loans.some(l=>l.dueday)) {
+    const withDue = loans.filter(l=>l.dueday).map(l=>({...l, days:daysUntilDue(l.dueday)})).sort((a,b)=>a.days-b.days);
+    const next = withDue[0];
+    document.getElementById('nextDue').textContent = next.days===0?'TODAY':next.days+'d';
+    document.getElementById('nextDueName').textContent = next.name;
+    const soon = withDue.filter(l=>l.days<=5);
+    if (soon.length>0) {
+      document.getElementById('dueTicker').style.display='flex';
+      document.getElementById('dueTickerText').textContent = soon.map(l=>`${l.name}: EMI ${fmt(l.emi)} due ${l.days===0?'TODAY':'in '+l.days+' day(s)'}`).join(' · ');
+    } else { document.getElementById('dueTicker').style.display='none'; }
+  } else {
+    document.getElementById('nextDue').textContent='—';
+    document.getElementById('nextDueName').textContent='no upcoming dues';
+    document.getElementById('dueTicker').style.display='none';
+  }
+}
+
+function renderLoans() {
+  const filter = document.getElementById('filterType').value;
+  const list = document.getElementById('loansList');
+  const filtered = filter==='All' ? loans : loans.filter(l=>l.type===filter);
+  if (filtered.length===0) {
+    list.innerHTML=`<div class="empty"><div class="empty-icon">📋</div><div class="empty-text">No loans yet. Add your first loan!</div></div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(loan => {
+    const pct = loan.principal>0 ? Math.round(((loan.principal-loan.balance)/loan.principal)*100) : 0;
+    const days = loan.dueday ? daysUntilDue(loan.dueday) : null;
+    const dueClass = days!==null ? (days<=3?'due-soon':days<=7?'emi':'ok') : '';
+    const dueText = days!==null ? (days===0?'TODAY':`in ${days}d`) : 'N/A';
+    return `<div class="loan-card" data-type="${loan.type}" data-id="${loan.id}">
+      <div class="loan-top">
+        <div>
+          <div class="loan-name-row">
+            <div class="loan-name">${loan.name}</div>
+            <span class="loan-badge ${badgeClass(loan.type)}">${loan.type}</span>
+          </div>
+          <div class="loan-lender">${loan.lender||''}</div>
+        </div>
+        <div class="loan-actions">
+          <button class="btn-ghost" onclick="openPayModal('${loan.id}')">Log EMI</button>
+          <button class="btn-ghost" onclick="openDetailModal('${loan.id}')">Details</button>
+          <button class="btn-ghost" style="color:#ef4444;border-color:#ef4444" onclick="deleteLoan('${loan.id}')">✕</button>
+        </div>
+      </div>
+      <div class="loan-stats">
+        <div><div class="loan-stat-label">Outstanding</div><div class="loan-stat-val" style="color:var(--accent)">${fmt(loan.balance)}</div></div>
+        <div><div class="loan-stat-label">Monthly EMI</div><div class="loan-stat-val emi">${fmt(loan.emi)}</div></div>
+        <div><div class="loan-stat-label">Next Due</div><div class="loan-stat-val ${dueClass}">${loan.dueday?`${ordinal(loan.dueday)} (${dueText})`:'N/A'}</div></div>
+        <div><div class="loan-stat-label">Interest Rate</div><div class="loan-stat-val">${loan.rate?loan.rate+'% p.a.':'—'}</div></div>
+        <div><div class="loan-stat-label">Months Left</div><div class="loan-stat-val">${loan.months||'—'}</div></div>
+        <div><div class="loan-stat-label">Payments Made</div><div class="loan-stat-val ok">${(loan.payments||[]).length}</div></div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-label"><span>Payoff Progress</span><span>${pct}% paid off</span></div>
+        <div class="progress-bar"><div class="progress-fill ${fillClass(loan.type)}" style="width:${pct}%"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ---- HELPERS ----
+function daysUntilDue(dueDay) {
+  const d = new Date(today.getFullYear(), today.getMonth(), dueDay);
+  if (d < today) d.setMonth(d.getMonth()+1);
+  return Math.ceil((d-today)/86400000);
+}
+function badgeClass(t) { return t==='Personal Loan'?'badge-personal':t==='Credit Card Debt'?'badge-cc':'badge-other'; }
+function fillClass(t) { return t==='Personal Loan'?'fill-personal':t==='Credit Card Debt'?'fill-cc':'fill-other'; }
+function ordinal(n) { const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openAddModal() { document.getElementById('addModal').classList.add('open'); }
+
+// ---- SAVE LOAN ----
+function saveLoan() {
+  const name = document.getElementById('f_name').value.trim();
+  const balance = document.getElementById('f_balance').value;
+  if (!name||!balance) { showToast('Name and Outstanding Balance are required','error'); return; }
+  const loan = {
+    id: Date.now().toString(), name,
+    lender: document.getElementById('f_lender').value.trim(),
+    type: document.getElementById('f_type').value,
+    principal: +document.getElementById('f_principal').value || +balance,
+    balance: +balance,
+    emi: +document.getElementById('f_emi').value||0,
+    rate: document.getElementById('f_rate').value,
+    dueday: +document.getElementById('f_dueday').value||null,
+    months: +document.getElementById('f_months').value||null,
+    notes: document.getElementById('f_notes').value.trim(),
+    payments: [], createdAt: new Date().toISOString()
+  };
+  loans.push(loan);
+  saveToCloud();
+  closeModal('addModal');
+  ['f_name','f_lender','f_balance','f_emi','f_principal','f_rate','f_dueday','f_months','f_notes'].forEach(id=>document.getElementById(id).value='');
+  renderAll();
+  showToast('Loan added & saved to cloud ☁','success');
+}
+
+// ---- DELETE ----
+function deleteLoan(id) {
+  if (!confirm('Remove this loan?')) return;
+  loans = loans.filter(l=>l.id!==id);
+  saveToCloud(); renderAll();
+  showToast('Loan removed','success');
+}
+
+// ---- PAYMENT ----
+function openPayModal(id) {
+  activePayLoanId = id;
+  const loan = loans.find(l=>l.id===id);
+  document.getElementById('payLoanName').textContent = loan.name+' — '+fmt(loan.balance)+' outstanding';
+  document.getElementById('p_amount').value = loan.emi||'';
+  document.getElementById('p_date').value = today.toISOString().split('T')[0];
+  document.getElementById('payModal').classList.add('open');
+}
+function confirmPayment() {
+  const amt = +document.getElementById('p_amount').value;
+  const dt = document.getElementById('p_date').value;
+  const reduce = document.getElementById('p_reduce').value;
+  if (!amt||!dt) { showToast('Please fill amount and date','error'); return; }
+  const loan = loans.find(l=>l.id===activePayLoanId);
+  if (!loan.payments) loan.payments=[];
+  loan.payments.push({amount:amt, date:dt});
+  if (reduce==='yes') { loan.balance=Math.max(0,loan.balance-amt); if(loan.months&&loan.months>0) loan.months-=1; }
+  saveToCloud();
+  closeModal('payModal');
+  renderAll();
+  showToast('Payment logged & synced ☁','success');
+}
+
+// ---- DETAILS ----
+function openDetailModal(id) {
+  const loan = loans.find(l=>l.id===id);
+  document.getElementById('detailTitle').textContent = loan.name;
+  document.getElementById('detailPayBtn').onclick = ()=>{ closeModal('detailModal'); openPayModal(id); };
+  const payments = loan.payments||[];
+  const totalPaidAmt = payments.reduce((s,p)=>s+(+p.amount),0);
+  const pct = loan.principal>0?Math.round(((loan.principal-loan.balance)/loan.principal)*100):0;
+  document.getElementById('detailBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:12px;margin-bottom:18px;">
+      <div><div class="loan-stat-label">Type</div><div>${loan.type}</div></div>
+      <div><div class="loan-stat-label">Lender</div><div>${loan.lender||'—'}</div></div>
+      <div><div class="loan-stat-label">Principal</div><div>${fmt(loan.principal)}</div></div>
+      <div><div class="loan-stat-label">Outstanding</div><div style="color:var(--accent)">${fmt(loan.balance)}</div></div>
+      <div><div class="loan-stat-label">Monthly EMI</div><div style="color:var(--yellow)">${fmt(loan.emi)}</div></div>
+      <div><div class="loan-stat-label">Interest Rate</div><div>${loan.rate?loan.rate+'%':'—'}</div></div>
+      <div><div class="loan-stat-label">Due Day</div><div>${loan.dueday?ordinal(loan.dueday):'—'}</div></div>
+      <div><div class="loan-stat-label">Months Left</div><div>${loan.months||'—'}</div></div>
+      <div><div class="loan-stat-label">Total Paid</div><div style="color:var(--green)">${fmt(totalPaidAmt)}</div></div>
+      <div><div class="loan-stat-label">Payoff %</div><div style="color:var(--green)">${pct}%</div></div>
+    </div>
+    ${loan.notes?`<div style="background:var(--surface2);border-radius:8px;padding:10px 14px;font-size:11px;color:var(--muted);margin-bottom:16px;">${loan.notes}</div>`:''}
+    <div class="loan-stat-label" style="margin-bottom:8px">Payment History (${payments.length})</div>
+    ${payments.length===0?'<div style="color:var(--muted);font-size:12px;">No payments logged yet.</div>':
+      '<div class="payment-log">'+payments.slice().reverse().map(p=>`
+        <div class="payment-entry">
+          <span class="payment-date">${new Date(p.date).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}</span>
+          <span class="payment-amt">+${fmt(p.amount)}</span>
+        </div>`).join('')+'</div>'}`;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+// ---- CLOSE ON BACKDROP ----
+document.querySelectorAll('.modal-backdrop').forEach(el => {
+  el.addEventListener('click', e=>{ if(e.target===el) el.classList.remove('open'); });
+});
+
+// ---- SAMPLE DATA ----
+function getSampleData() {
+  return [
+    { id:'demo1', name:'HDFC Personal Loan', lender:'HDFC Bank', type:'Personal Loan',
+      principal:300000, balance:185000, emi:12500, rate:'13.5', dueday:5, months:15,
+      notes:'For home renovation', payments:[{amount:12500,date:'2026-02-05'},{amount:12500,date:'2026-01-05'}], createdAt:'2025-06-01T00:00:00Z'},
+    { id:'demo2', name:'SBI Credit Card', lender:'SBI Card', type:'Credit Card Debt',
+      principal:80000, balance:52000, emi:5000, rate:'36', dueday:12, months:11,
+      notes:'Minimum payment ₹2500', payments:[{amount:5000,date:'2026-02-12'}], createdAt:'2025-10-01T00:00:00Z'},
+    { id:'demo3', name:'Friend Loan — Ramesh', lender:'Ramesh K.', type:'Other',
+      principal:50000, balance:30000, emi:5000, rate:'0', dueday:20, months:6,
+      notes:'Interest free — pay by June 2026', payments:[{amount:5000,date:'2026-02-20'},{amount:5000,date:'2026-01-20'}], createdAt:'2025-10-20T00:00:00Z'}
+  ];
+}
+</script>
+</body>
+</html>
